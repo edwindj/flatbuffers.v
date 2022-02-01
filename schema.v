@@ -2,23 +2,23 @@ module flatbuffers
 
 struct Schema {
 mut:
-	includes []string
-	root string
+	includes   []string
+	root       string
 	namespaces []string
-	types []Type
-	enums []Enum
+	types      []Type
+	enums      []Enum
 }
 
-type Type = Table | Struct
+type Type = Struct | Table
 
 struct Table {
 	fields []Field
 }
 
 struct Field<T> {
-	name string
-	@type string
-	default T
+	name     string
+	@type    string
+	default  T
 	metadata Metadata
 }
 

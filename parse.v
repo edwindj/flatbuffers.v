@@ -2,41 +2,83 @@ module flatbuffers
 
 import strings.textscanner
 
-type Scanner = textscanner.TextScanner
+type TScanner = textscanner.TextScanner
 
-struct Sscanner {
-mut: 
-   sc textscanner.TextScanner
-   line int
-pub mut:
+struct Parser {
+mut:
+   sc &Scanner
+   namespace string
    schema Schema
 }
 
-pub fn parse(s string){
-	mut sc := textscanner.new(s)
-	parse_schema(mut sc) or {panic(error)}
+fn new_parser(s string) &Parser {
+	mut sc := new_scanner(s)
+	p := &Parser{sc: sc}
+	return p	
 }
 
-fn consume_ws(mut sc Scanner){
-	mut c := sc.peek()
+struct FBSScanner {
+mut:
+	ts   textscanner.TextScanner
+	line int = 1
+pub mut:
+	schema Schema
+}
+
+pub fn parse(s string) ?Schema {
+	mut ts := textscanner.new(s)
+	mut sc := FBSScanner{
+		ts: ts
+		line: 1
+	}
+
+	sc.parse_schema() ?
+	return sc.schema
+}
+
+fn (mut sc FBSScanner) consume_ws() {
+	mut ts := &sc.ts
+	mut c := ts.peek()
 	for {
 		match rune(c) {
-			` `, `\t` { 
-				sc.next()
-				c = sc.peek()
+			` `, `\t` {
+				ts.next()
+				c = ts.peek()
 			}
 			`\n` {
-				sc.next()
+				ts.next()
 				// update line
-				c = sc.peek()
+				c = ts.peek()
 			}
-			else {break}
+			else {
+				break
+			}
+		}
+	}
+}
+
+fn consume_ws(mut ts TScanner) {
+	mut c := ts.peek()
+	for {
+		match rune(c) {
+			` `, `\t` {
+				ts.next()
+				c = ts.peek()
+			}
+			`\n` {
+				ts.next()
+				// update line
+				c = ts.peek()
+			}
+			else {
+				break
+			}
 		}
 	}
 }
 
 [inline]
-fn expect(mut sc Scanner, s string){
+fn expect(mut sc TScanner, s string) {
 	runes := s.runes()
 	for c in runes {
 		if sc.next() != c {
@@ -45,7 +87,7 @@ fn expect(mut sc Scanner, s string){
 	}
 }
 
-fn comment(mut sc Scanner) string {
+fn comment(mut sc TScanner) string {
 	mut comment := []rune{}
 	if sc.peek() == `/` && sc.peek_n(1) == `/` {
 		sc.skip_n(2)
@@ -58,7 +100,7 @@ fn comment(mut sc Scanner) string {
 	return comment.string()
 }
 
-fn consume_word(mut sc Scanner) string {
+fn consume_word(mut sc TScanner) string {
 	consume_ws(mut sc)
 	mut word := []rune{}
 	mut c := sc.peek()
@@ -71,42 +113,87 @@ fn consume_word(mut sc Scanner) string {
 }
 
 // peek might consume whitespace
-fn peek_word(mut sc Scanner) string {
+fn peek_word(mut sc TScanner) string {
 	word := consume_word(mut sc)
 	sc.back_n(word.len)
 	return word
 }
 
 // schema = include* ( namespace_decl | type_decl | enum_decl | root_decl | file_extension_decl | file_identifier_decl | attribute_decl | rpc_decl | object )*
-pub fn parse_schema(mut sc Scanner) ?{
-	for sc.remaining() > 0 {
-		word := peek_word(mut sc)
+pub fn (mut sc FBSScanner) parse_schema() ? {
+	mut ts := &sc.ts
+	for ts.remaining() > 0 {
+		word := peek_word(mut ts)
 		match word {
-			"namespace" { parse_namespace_decl(mut sc) }
+			'namespace' {
+				sc.parse_namespace_decl()
+			}
+			'roottype' {
+				error('not implemented')
+			}
+			'enum' {
+				error('not implemented')
+			}
+			'include' {
+				sc.include()
+			}
 			else {
-				sc.goto_end()
-				error("Unexpected keyword: '$word'")
+				error("Unexpected keyword: '$word' at line $sc.line")
 			}
 		}
+		sc.consume_ws()
 	}
 }
 
+// pub fn parse_schema(mut sc TScanner) ?{
+// 	for sc.remaining() > 0 {
+// 		word := peek_word(mut sc)
+// 		match word {
+// 			"namespace" { parse_namespace_decl(mut sc) }
+// 			else {
+// 				sc.goto_end()
+// 				error("Unexpected keyword: '$word'")
+// 			}
+// 		}
+// 	}
+// }
 
 // include = include string_constant ;
+fn (mut sc FBSScanner) include() string {
+	mut ts := &sc.ts
+	expect(mut ts, 'include')
+	consume_ws(mut ts)
+	return string_constant(mut ts)
+}
 
 // namespace_decl = namespace ident ( . ident )* ;
-fn parse_namespace_decl(mut sc Scanner) string {
-	expect(mut sc, "namespace")
 
-	mut namespace := parse_ident(mut sc)
-	if sc.peek() == `.` {
-		namespace += "." + parse_ident(mut sc)
+fn (mut sc FBSScanner) parse_namespace_decl() string {
+	mut ts := &sc.ts
+	expect(mut ts, 'namespace')
+
+	mut namespace := sc.ident()
+	if ts.peek() == `.` {
+		namespace += '.' + sc.ident()
 	}
-	consume_ws(mut sc)
-	expect(mut sc, ";")
-	println("namespace $namespace")
+	consume_ws(mut ts)
+	expect(mut ts, ';')
+	println('namespace $namespace')
 	return namespace
 }
+
+// fn parse_namespace_decl(mut sc TScanner) string {
+// 	expect(mut sc, "namespace")
+
+// 	mut namespace := parse_ident(mut sc)
+// 	if sc.peek() == `.` {
+// 		namespace += "." + parse_ident(mut sc)
+// 	}
+// 	consume_ws(mut sc)
+// 	expect(mut sc, ";")
+// 	println("namespace $namespace")
+// 	return namespace
+// }
 
 // attribute_decl = attribute ident | "ident" ;
 
@@ -143,25 +230,57 @@ fn parse_namespace_decl(mut sc Scanner) string {
 // file_identifier_decl = file_identifier string_constant ;
 
 // string_constant = \".*?\\"
+fn string_constant(mut ts TScanner) string {
+	mut sconstant := []rune{}
+
+	mut c := ts.next()
+	if c == `"` {
+		c = ts.next()
+		for c != `"` {
+			sconstant << c
+			c = ts.next()
+		}
+	}
+	return sconstant.string()
+}
 
 // ident = [a-zA-Z_][a-zA-Z0-9_]*
-fn parse_ident(mut sc Scanner) string {
-	consume_ws(mut sc)
+fn (mut sc FBSScanner) ident() string {
+	mut ts := &sc.ts
+	sc.consume_ws()
 	mut ident := []rune{}
-	mut c := sc.peek()
+	mut c := ts.peek()
 	if (c >= `A` && c <= `z`) || (c == `_`) {
-			ident << rune(sc.next())
-			c = sc.peek()
-			for (c >= `A` && c <= `z`) || (c == `_`) || (c >= `0` && c <= `9`) {
-				ident << rune(sc.next())
-				c = sc.peek()
-			}
+		ident << rune(ts.next())
+		c = ts.peek()
+		for (c >= `A` && c <= `z`) || (c == `_`) || (c >= `0` && c <= `9`) {
+			ident << rune(ts.next())
+			c = ts.peek()
+		}
 	} else {
-		return ""
+		return ''
 	}
 
 	return ident.string()
 }
+
+// fn parse_ident(mut sc TScanner) string {
+// 	consume_ws(mut sc)
+// 	mut ident := []rune{}
+// 	mut c := sc.peek()
+// 	if (c >= `A` && c <= `z`) || (c == `_`) {
+// 			ident << rune(sc.next())
+// 			c = sc.peek()
+// 			for (c >= `A` && c <= `z`) || (c == `_`) || (c >= `0` && c <= `9`) {
+// 				ident << rune(sc.next())
+// 				c = sc.peek()
+// 			}
+// 	} else {
+// 		return ""
+// 	}
+
+// 	return ident.string()
+// }
 
 // [:digit:] = [0-9]
 
@@ -182,5 +301,3 @@ fn parse_ident(mut sc Scanner) string {
 // float_constant = dec_float_constant | hex_float_constant | special_float_constant
 
 // boolean_constant = true | false
-
-

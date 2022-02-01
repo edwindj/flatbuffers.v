@@ -1,9 +1,9 @@
 module flatbuffers
 
-fn test_parse_schema(){
-	schema := "namespace test;
-" 
-	parse(schema)
+fn test_parse_schema() {
+	schema := 'namespace test;
+'
+	parse(schema) or { panic(error) }
 
-	parse("namespace test")
+	parse('namespace test') or { panic(error) }
 }
