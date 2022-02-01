@@ -3,11 +3,13 @@ module flatbuffers
 fn test_scanner() {
 	s := 'namespace test;
 
-fiets  = "fiets.txt"	
+fiets  = "fiets.txt"
 b = 1
 c = 1.4
 struct A {}
 table B{a: string}
+root_type test;
+attribute i;
 '
 
 	mut sc := new_scanner(s)
@@ -24,7 +26,7 @@ table B{a: string}
 
 	mut a := sc.next()
 	for a.tok != .eof {
-		println(a)
+		print("'${a.lit}'<${a.tok}> ")
 		a = sc.next()
 	}
 }

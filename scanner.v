@@ -33,6 +33,7 @@ enum TokenType {
 	colon // :
 	assign // =
 	comma // ,
+	root_type
 	string_constant
 	integer_constant
 	float_constant
@@ -65,7 +66,7 @@ fn new_scanner(s string) &Scanner {
 
 // consume whitespace
 fn (mut sc Scanner) ws() {
-	if sc.ts.current() == -1 {
+	if sc.ts.peek() == -1 {
 		return
 	}
 
@@ -120,6 +121,7 @@ const (
 		'table':     TokenType.table
 		'struct':    TokenType.@struct
 		'attribute': TokenType.attribute
+		'root_type': TokenType.root_type
 	}
 
 	// complex regex tokens
@@ -175,29 +177,14 @@ fn (mut sc Scanner) next() Token {
 	}
 
 	s := r.string()
-	// TODO match tok type
-	tok = match s {
-		'namespace' {
-			TokenType.namespace
-		}
-		'union' {
-			TokenType.@union
-		}
-		'struct' {
-			TokenType.@struct
-		}
-		'table' {
-			TokenType.table
-		}
-		else {
-		  tok
-		}
-	}
+	// match keywords
+	tok = token_keyword[s] or {tok}
 
 	if s in simple_types {
 		tok = .simple_type
 	}
 
+    // match complex tokens
 	if tok == .unknown {
 		for qry, tok2 in token_re {
 			mut re := regex.regex_opt(qry) or { panic(err.msg) }
