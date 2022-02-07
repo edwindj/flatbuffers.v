@@ -5,27 +5,51 @@ mut:
 	includes   []string
 	root       string
 	namespaces []string
-	types      []Type
-	enums      []Enum
+	types      []TypeDecl
+	enums      []EnumDecl
+	unions     []UnionDecl
+	attributes []string
+	file_extension string
+	file_identifier string  // should be char 4
 }
 
-type Type = Struct | Table
+type TypeDecl = StructDecl | TableDecl
 
-struct Table {
-	fields []Field
+struct TableDecl {
+	ns string
+	name   string
+	fields []FieldDecl
+	metadata []string
 }
 
-struct Field<T> {
+struct FieldDecl {
+mut:
 	name     string
 	@type    string
-	default  T
+	default_value  string
 	metadata Metadata
 }
 
-struct Struct {
+struct StructDecl {
+	ns     string
+	name   string
+	fields []FieldDecl
 }
 
-struct Enum {
+struct EnumDecl {
+mut:
+    ns string
+	name string
+	@type string
+	values []string
+	int_values []string
+}
+
+struct UnionDecl {
+mut:
+    ns string
+	name string
+	values []string
 }
 
 struct Metadata {

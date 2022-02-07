@@ -16,13 +16,17 @@ fn (t Token) str() string {
 
 enum TokenType {
 	unknown
+	include
 	namespace
 	@struct
 	table
 	simple_type
 	@union
 	attribute
+	@enum
 	ident
+	file_identifier
+	file_extension
 	lparen // {
 	rparen // }
 	lbracket // {
@@ -33,6 +37,7 @@ enum TokenType {
 	colon // :
 	assign // =
 	comma // ,
+	dot // .
 	root_type
 	string_constant
 	integer_constant
@@ -45,6 +50,7 @@ struct Scanner {
 mut:
 	line int = 1
 	ts   textscanner.TextScanner
+	current Token
 	file string
 }
 
@@ -112,16 +118,21 @@ const (
 		`"`: TokenType.string_constant
 		`,`: TokenType.comma
 		`=`: TokenType.assign
+		`.`: TokenType.dot
 	}
 
 	// keywords
 	token_keyword = {
+		'include':   TokenType.include
 		'namespace': TokenType.namespace
 		'union':     TokenType.@union
 		'table':     TokenType.table
 		'struct':    TokenType.@struct
 		'attribute': TokenType.attribute
 		'root_type': TokenType.root_type
+		'enum'     : TokenType.@enum
+		'file_extension' : TokenType.file_extension
+		'file_identifier': TokenType.file_identifier
 	}
 
 	// complex regex tokens
@@ -140,7 +151,7 @@ fn (mut sc Scanner) next() Token {
 
 	mut c := sc.ts.peek()
 	if c == -1 {
-		println('eof?')
+		// println('eof?')
 		return Token{
 			line: sc.line
 			tok: .eof
@@ -198,12 +209,12 @@ fn (mut sc Scanner) next() Token {
 
 	// Should there be an error when tok is still unknown?
 	// For debugging this is less useful...
-
-	return Token{
+	sc.current =  Token{
 		line: sc.line
 		tok: tok
 		lit: s
-	}
+	}	
+	return sc.current
 }
 
 fn (mut sc Scanner) peek() Token {
