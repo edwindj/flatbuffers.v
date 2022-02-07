@@ -87,12 +87,26 @@ fn test_eof(){
 	"
 
 	mut p := new_parser(schema)
-	mut t := p.sc.next()
-	for t.tok != .eof {
-		println(t)
-		t = p.sc.next()
+	s := p.parse_schema() or {
+		println(err)
+		Schema{}
 	}
-	println(t)
+	assert "test" in s.namespaces
+	// println(s)
+}
+
+fn test_field_decl(){
+	fbs := "table Test {
+   b:bool;
+   w:[Weapons];
+}"
+    mut p := new_parser(fbs)
+	s := p.parse_schema() or {
+		println(err)
+		Schema{}
+	}
+
+	println(s)
 }
 
 
@@ -130,5 +144,9 @@ table Weapon {
 
 root_type Monster;"
 	mut p := new_parser(schema)
-	// s := p.parse_schema()?
+	s := p.parse_schema() or {
+		println(err)
+		Schema{}
+	}
+	println(s)
 }

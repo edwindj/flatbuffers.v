@@ -38,6 +38,7 @@ enum TokenType {
 	assign // =
 	comma // ,
 	dot // .
+	comment
 	root_type
 	string_constant
 	integer_constant
@@ -71,28 +72,56 @@ fn new_scanner(s string) &Scanner {
 }
 
 // consume whitespace
-fn (mut sc Scanner) ws() {
-	if sc.ts.peek() == -1 {
+fn (mut sc Scanner) ws() {	
+	if sc.ts.remaining() == 0 {
+		// println('eof')
 		return
 	}
 
 	mut ts := &sc.ts
 	for {
 		mut c := ts.peek()
-		match rune(c) {
-			` `, `\t`, `\r` {
-				ts.skip()
-				c = ts.peek()
+		// if c >=0 {
+		// 	println("c: ${rune(c)}")
+		// }
+		match true {
+			c in [` `, `\t`, `\r`] {
+				ts.next()
 			}
-			`\n` {
-				ts.skip()
+			c == `\n` {
+				ts.next()
 				sc.line += 1
+			}
+			c == `/` { //comment?
+				ts.next()
 				c = ts.peek()
+				//TODO when not comment generate error
+				assert c == `/`
+				for c != -1 && c != `\n`{
+					c = ts.next()
+					if c == `\n` {
+						sc.line += 1
+					}
+				}
 			}
 			else {
-				break
+				return
 			}
 		}
+		// match rune(c) {
+		// 	` `, `\t`, `\r` {
+		// 		ts.skip()
+		// 		c = ts.peek()
+		// 	}
+		// 	`\n` {
+		// 		ts.skip()
+		// 		sc.line += 1
+		// 		c = ts.peek()
+		// 	}
+		// 	else {
+		// 		break
+		// 	}
+		// }
 	}
 }
 
@@ -119,6 +148,7 @@ const (
 		`,`: TokenType.comma
 		`=`: TokenType.assign
 		`.`: TokenType.dot
+		`/`: TokenType.comment
 	}
 
 	// keywords
@@ -133,12 +163,13 @@ const (
 		'enum'     : TokenType.@enum
 		'file_extension' : TokenType.file_extension
 		'file_identifier': TokenType.file_identifier
+		'true'     : TokenType.boolean_constant
+		'false'    : TokenType.boolean_constant
 	}
 
 	// complex regex tokens
 	token_re = {
 		'^[A-z][A-z0-9_]*$':                                                 TokenType.ident
-		'^(true)|(false)$':                                                  TokenType.boolean_constant
 		'^[-+]?[0-9]+$':                                                     TokenType.integer_constant
 		'^[-+]?(([.][0-9]+)|([0-9]+[.][0-9]*)|([0-9]+))([eE][-+]?[0-9]+)?$': TokenType.float_constant
 	}
@@ -149,8 +180,7 @@ fn (mut sc Scanner) next() Token {
 	sc.ws()
 	// TODO comment
 
-	mut c := sc.ts.peek()
-	if c == -1 {
+	if sc.ts.remaining() == 0 {
 		// println('eof?')
 		return Token{
 			line: sc.line
@@ -159,6 +189,7 @@ fn (mut sc Scanner) next() Token {
 		}
 	}
 
+	mut c := sc.ts.peek()
 	mut r := []rune{cap: 20}
 	mut tok := token_char[c] or { TokenType.unknown }
 

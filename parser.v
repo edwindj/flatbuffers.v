@@ -72,6 +72,7 @@ pub fn (mut p Parser) parse_schema() ?Schema {
 				rt := p.expect(.ident)?
 				// TODO check if type is available?
 				s.root = rt.lit
+				p.expect(.semicolon)?
 			}
 			.file_extension {
 				ext := p.expect(.string_constant)?
@@ -85,7 +86,9 @@ pub fn (mut p Parser) parse_schema() ?Schema {
 				return error("Unexpected syntax at line: ${token.line}: ${token.lit}")
 			}
 		}
+		// println("before: ${token}")
 		token = p.sc.next()
+		// println("after: ${token}")
 	}
 	p.schema = s
 	return s
@@ -233,7 +236,9 @@ fn (mut p Parser) field_decl() ?FieldDecl{
 	if token.tok == .assign {
 		// scalar parsing
 		value := p.sc.next()
-		assert value.tok in [.boolean_constant, .float_constant, .string_constant, .integer_constant]
+		if !(value.tok in [.boolean_constant, .float_constant, .string_constant, .integer_constant, .ident]) {
+			return error("syntax error: expected constant value: ${value}")
+		}
 		f.default_value = value.lit
 		token = p.sc.next()
 	}
@@ -253,10 +258,10 @@ fn (mut p Parser) parse_type()?string {
 		.simple_type, .ident {
 			token.lit
 		}
-		.lbracket {
+		.lsqbracket {
 			p.sc.next()
 			a:= "[]" + p.parse_type()?
-			p.expect(.rbracket)?
+			p.expect(.rsqbracket)?
 			a
 		} else {
 			""
@@ -264,7 +269,7 @@ fn (mut p Parser) parse_type()?string {
 	}
 
 	if s == "" {
-		return 	error("expected a type definition, found ${token}")
+		return error("expected a type definition, found ${token}")
 	}
 	return s
 }
