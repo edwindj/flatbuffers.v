@@ -154,5 +154,30 @@ fn (u UnionDecl) str() string {
 	return s
 }
 
+struct RpcDecl {
+mut:
+	name string
+	methods []RpcMethod
+}
+
+struct RpcMethod {
+mut:
+	name string
+	param string
+	ret string
+	metadata Metadata
+}
+
 struct Metadata {
+}
+
+struct Object {
+mut:
+	props []KeyValue
+}
+
+struct KeyValue {
+mut:
+	key string
+	value string
 }

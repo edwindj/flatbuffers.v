@@ -66,7 +66,9 @@ fn test_comment(){
 
 	mut sc := new_scanner(s)
 	mut tok := sc.next()
-	println(tok)
+	assert tok.tok == .boolean_constant
+	assert tok.lit == "true"
 	tok = sc.next()
-	println(tok)
+	assert tok.tok == .boolean_constant
+	assert tok.lit == "false"
 }

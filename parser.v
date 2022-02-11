@@ -23,9 +23,14 @@ fn (mut p Parser) expect(t TokenType) ?Token {
 fn (mut p Parser) assure(t TokenType) ?Token {
 	token := p.sc.current
 	if token.tok != t {
-		return error("Syntax error at line ${token.line}, expected '${t}' instead of '${token.lit}'")
+		return error("Syntax error at line ${token.line}, expected a '${t}' instead of '${token.lit}'")
 	}
 	return token
+}
+
+fn (mut p Parser) unexpected(s string) ?{
+	token := p.sc.current
+	return error("Syntax error at line ${token.line}, did not expect: '${token.lit}'. ${s}")
 }
 
 fn (mut p Parser) test(t TokenType) bool {
@@ -83,7 +88,7 @@ pub fn (mut p Parser) parse_schema() ?Schema {
 				s.file_identifier = id.lit
 			}
 			else {
-				return error("Unexpected syntax at line: ${token.line}: ${token.lit}")
+				p.unexpected("")?
 			}
 		}
 		// println("before: ${token}")
@@ -237,7 +242,7 @@ fn (mut p Parser) field_decl() ?FieldDecl{
 		// scalar parsing
 		value := p.sc.next()
 		if !(value.tok in [.boolean_constant, .float_constant, .string_constant, .integer_constant, .ident]) {
-			return error("syntax error: expected constant value: ${value}")
+			p.unexpected("Expected a constant value.")?
 		}
 		f.default_value = value.lit
 		token = p.sc.next()
@@ -252,7 +257,7 @@ fn (mut p Parser) field_decl() ?FieldDecl{
 }
 
 // type = bool | byte | ubyte | short | ushort | int | uint | float | long | ulong | double | int8 | uint8 | int16 | uint16 | int32 | uint32| int64 | uint64 | float32 | float64 | string | [ type ] | ident
-fn (mut p Parser) parse_type()?string {
+fn (mut p Parser) parse_type() ?string {
 	mut token := p.sc.current
 	s := match token.tok {
 		.simple_type, .ident {
@@ -260,23 +265,54 @@ fn (mut p Parser) parse_type()?string {
 		}
 		.lsqbracket {
 			p.sc.next()
-			a:= "[]" + p.parse_type()?
+			a:= "[${p.parse_type()?}]"
 			p.expect(.rsqbracket)?
 			a
 		} else {
+			p.unexpected("Expected a type definition.")?
 			""
 		}
-	}
-
-	if s == "" {
-		return error("expected a type definition, found ${token}")
 	}
 	return s
 }
 
 // rpc_decl = rpc_service ident { rpc_method+ }
+fn (mut p Parser) rpc_decl() ?RpcDecl {
+	name := p.expect(.ident)?
+	mut token := p.expect(.lbracket)?
+	mut methods := []RpcMethod
+
+	for token.tok != .rbracket && token.tok != .eof {
+		method := p.rpc_method()?
+		methods << method
+	}
+
+	p.assure(.rbracket)?
+	r := RpcDecl{name: name.lit, methods: methods}
+	return r
+}
 
 // rpc_method = ident ( ident ) : ident metadata ;
+fn (mut p Parser) rpc_method() ?RpcMethod {
+	name := p.expect(.ident)?
+
+	p.expect(.lparen)? // "("
+	param := p.expect(.ident)?
+	p.expect(.rparen)? // ")"
+
+	p.expect(.colon)?
+	ret := p.expect(.ident)?
+	
+	mut token := p.sc.next()
+	if token.tok == .lparen { // "("
+		p.metadata()?
+		token = p.sc.next()
+	}
+	p.assure(.semicolon)? //";"
+
+	r := RpcMethod{name: name.lit, param: param.lit, ret: ret.lit}
+	return r
+}
 
 // type = bool | byte | ubyte | short | ushort | int | uint | float | long | ulong | double | int8 | uint8 | int16 | uint16 | int32 | uint32| int64 | uint64 | float32 | float64 | string | [ type ] | ident
 
@@ -301,10 +337,55 @@ fn (mut p Parser) metadata()? []string {
 // scalar = boolean_constant | integer_constant | float_constant
 
 // object = { commasep( ident : value ) }
+fn (mut p Parser) object() ?Object{
+	p.assure(.lbracket)?
+	mut token := p.sc.next()
+	mut o := Object{}
+
+	for token.tok != .rbracket {
+		prop := p.assure(.ident)?
+		p.expect(.colon)?
+		value := p.value()?
+
+		o.props << KeyValue{prop.lit, value}
+
+		p.expect(.comma) or {
+			break
+		}
+	}
+
+	p.assure(.rbracket)?
+	return o
+}
 
 // single_value = scalar | string_constant
 
 // value = single_value | object | [ commasep( value ) ]
+fn (mut p Parser) value() ?string{
+	mut token := p.sc.next()
+	match token.tok {
+		.string_constant, .float_constant, .integer_constant, .ident {
+			return token.lit
+		}
+		.lbracket {
+			o := p.object()?
+			return o.str()
+		} 
+		.lsqbracket {
+			mut values := []string
+			for {
+				values << p.value()?
+				p.expect(.comma) or {break}
+			}
+			p.assure(.rsqbracket)?
+			return "[${values.join(', ')}]"
+
+		} else {
+			return error("Syntax error at line ${token.line}, unexpected ${token.lit}")
+		}
+	}
+	return ""
+}
 
 // commasep(x) = [ x ( , x )* ]
 

@@ -61,7 +61,7 @@ fn test_error(){
 	mut schema := 'namespace test'
 	mut p := new_parser(schema)
 	p.parse_schema() or {
-		assert err.msg == "Syntax error at line 1, expected 'semicolon' instead of 'test'"
+		assert err.msg == "Syntax error at line 1, expected a 'semicolon' instead of 'test'"
 	}
 }
 
@@ -148,5 +148,5 @@ root_type Monster;"
 		println(err)
 		Schema{}
 	}
-	println(s)
+	println(s.to_v())
 }

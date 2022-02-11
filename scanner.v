@@ -44,6 +44,7 @@ enum TokenType {
 	integer_constant
 	float_constant
 	boolean_constant
+	rpc_service
 	eof
 }
 
@@ -165,6 +166,7 @@ const (
 		'file_identifier': TokenType.file_identifier
 		'true'     : TokenType.boolean_constant
 		'false'    : TokenType.boolean_constant
+		'rpc_service' : TokenType.rpc_service
 	}
 
 	// complex regex tokens
