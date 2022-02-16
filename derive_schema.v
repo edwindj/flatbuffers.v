@@ -6,20 +6,19 @@ fn derive_schema<T>() ?Schema {
 	mut s := Schema{}
 	// compile-time `for` loop
 	// T.fields gives an array of a field metadata type
-
-	root := derive_table<T>(mut s)?
+	t := T{}
+	s.root = derive_table<T>(t, mut s)
 	//s.root = root.name
 
 	return s
 }
 
-fn derive_table<T>(mut s Schema) ?T {
-	name := T.name[1..]
-	// println(T.attrs)
-	println(name)
-	mut t := T{}
-	mut tb := TableDecl{name: name}
+fn derive_table<T>(t T, mut s Schema) string{
+	tn := "$T.name"[1..]
+	mut tb := TableDecl{name: T.name[1..]}
 	$for field in T.fields {
+		println(field)
+		val := t.$(field.name)
 		$if field.typ is string {
 			tb.fields << FieldDecl{name:field.name, @type:"string"}
 		} $else $if field.typ is int {
@@ -29,10 +28,15 @@ fn derive_table<T>(mut s Schema) ?T {
 		} $else $if field.typ is byte {
 			tb.fields << FieldDecl{name:field.name, @type:"ubyte"}
 		} $else {
-			p := typeof(t.$(field.name)).name
-			tb.fields << FieldDecl{name:field.name, @type: p[1..]}
+			p := typeof(t.$(field.name)).name[1..]
+			tbls := s.types.map(it.name)
+			if !(p in tbls) {
+				derive_table(val, mut s)
+			}
+
+			tb.fields << FieldDecl{name:field.name, @type: p}
 		}
 	}
 	s.types << tb
-	return t
+	return tn
 }
